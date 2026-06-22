@@ -14,16 +14,27 @@ func (m AppModel) View() string {
 	var rightSide strings.Builder
 	var finalView strings.Builder
 
-	// Dynamically compute the spacing separator string from config.go parameters
-	spacingStr := strings.Repeat("\n", m.Layout.MenuSpacing)
+	// Dynamically compute layout metrics from config parameters
+	spacingStr := strings.Repeat("\n", m.Config.Layout.MenuSpacing)
 
-	// 1. DYNAMIC LAYOUT DEFINITIONS USING CONFIG FIELDS
+	// 1. DYNAMIC FOCUS CONTRAST LAYOUT STYLING
+	// Dim or enrich text contrast colors automatically depending on which side of the app is active
+	leftForeground := lipgloss.Color("#FFFFFF")
+	rightForeground := lipgloss.Color("#FFFFFF")
+	if m.Engine.Ctx.PanelFocus == "right" {
+		leftForeground = ColorTextMuted
+	} else {
+		rightForeground = ColorTextMuted
+	}
+
 	var (
 		leftColumn = lipgloss.NewStyle().
-				Width(m.Layout.ColumnWidth).
+				Width(m.Config.Layout.ColumnWidth).
+				Foreground(leftForeground).
 				PaddingRight(2)
 		rightColumn = lipgloss.NewStyle().
-				Width(m.Layout.ColumnWidth).
+				Width(m.Config.Layout.ColumnWidth).
+				Foreground(rightForeground).
 				Border(lipgloss.NormalBorder(), false, false, false, true).
 				BorderForeground(ColorNeutral).
 				PaddingLeft(3)
@@ -42,7 +53,54 @@ func (m AppModel) View() string {
 			} else {
 				leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  %s", item.Title)))
 			}
-			leftSide.WriteString(spacingStr) // 👈 Dynamic Spacing Applied
+			leftSide.WriteString(spacingStr)
+		}
+
+	case workflow.StateUnsavedChangesWarning: // 🆕 RENDER: Phase 1 Safety Shield View
+		leftSide.WriteString(StyleErrorBanner.Render("⚠️ WARNING: UNCOMMITTED CHANGES DETECTED"))
+		leftSide.WriteString("\n\n")
+		leftSide.WriteString("Your workspace contains dirty local updates that could be accidentally overwritten.\n\n")
+		leftSide.WriteString("Options:\n")
+		leftSide.WriteString(StyleSelectedOption.Render("  [Y] Bypasses warning shield and continue onto tasks anyway\n"))
+		leftSide.WriteString(StyleUnselectedOption.Render("  [N / Enter] Return immediately to safety on the dashboard\n"))
+
+	case workflow.StateSettingsMenu: // 🆕 RENDER: Interactive Settings Layout View
+		leftSide.WriteString(StyleHeader.Render("⚙️ EasyFlow Configuration Profile Settings:"))
+		leftSide.WriteString("\n\n")
+		subOptions := GetSubMenuOptions("settings")
+		for i, item := range subOptions {
+			var currentSettingVal string
+			switch i {
+			case 0:
+				currentSettingVal = fmt.Sprintf("[ %d Lines ]", m.Config.Layout.MenuSpacing)
+			case 1:
+				currentSettingVal = fmt.Sprintf("[ %d Chars ]", m.Config.Layout.ColumnWidth)
+			case 2:
+				currentSettingVal = fmt.Sprintf("[ %s ]", m.Config.Workflow.MergePolicy)
+			case 3:
+				currentSettingVal = fmt.Sprintf("[ Shield: %t ]", m.Config.Workflow.SafetyShield)
+			}
+
+			if m.IssueCursor == i {
+				leftSide.WriteString(StyleSelectedOption.Render(fmt.Sprintf("> %s : %s\n  %s", item.Title, currentSettingVal, item.Description)))
+			} else {
+				leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  %s : %s", item.Title, currentSettingVal)))
+			}
+			leftSide.WriteString(spacingStr)
+		}
+		leftSide.WriteString(StyleHelpText.Render("\n💡 Tip: Press [ENTER] to cycle settings. Press [ESC] to save & return."))
+
+	case workflow.StateManageStash: // 🆕 RENDER: Stash Submenu List View
+		leftSide.WriteString(StyleHeader.Render("📦 Stash Shelf Control Actions:"))
+		leftSide.WriteString("\n\n")
+		subOptions := GetSubMenuOptions("stash")
+		for i, item := range subOptions {
+			if m.IssueCursor == i {
+				leftSide.WriteString(StyleSelectedOption.Render(fmt.Sprintf("> %s\n  %s", item.Title, item.Description)))
+			} else {
+				leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  %s", item.Title)))
+			}
+			leftSide.WriteString(spacingStr)
 		}
 
 	case workflow.StateManageIssues:
@@ -55,7 +113,7 @@ func (m AppModel) View() string {
 			} else {
 				leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  %s", item.Title)))
 			}
-			leftSide.WriteString(spacingStr) // 👈 Dynamic Spacing Applied
+			leftSide.WriteString(spacingStr)
 		}
 
 	case workflow.StateManageBranches:
@@ -68,7 +126,7 @@ func (m AppModel) View() string {
 			} else {
 				leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  %s", item.Title)))
 			}
-			leftSide.WriteString(spacingStr) // 👈 Dynamic Spacing Applied
+			leftSide.WriteString(spacingStr)
 		}
 
 	case workflow.StateManageCommits:
@@ -81,7 +139,7 @@ func (m AppModel) View() string {
 			} else {
 				leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  %s", item.Title)))
 			}
-			leftSide.WriteString(spacingStr) // 👈 Dynamic Spacing Applied
+			leftSide.WriteString(spacingStr)
 		}
 
 	case workflow.StateListBranches:
@@ -90,17 +148,24 @@ func (m AppModel) View() string {
 		} else {
 			leftSide.WriteString(StyleHeader.Render("🗑️ Select Local Branch to Delete:"))
 		}
-		leftSide.WriteString("\n\n")
+		leftSide.WriteString("\n")
+		// 🆕 Live Filter Header input box display
+		leftSide.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00FFD2")).Render(fmt.Sprintf("🔍 Live List Search Filter: %s█\n\n", m.Engine.Ctx.SearchFilter)))
+
 		if len(m.Issues) == 0 && !m.Loading {
 			leftSide.WriteString(lipgloss.NewStyle().Foreground(ColorTextMuted).Render("No local branches discovered.\n"))
 		} else {
 			for i, b := range m.Issues {
+				// Filter list matching checks before printing line layout
+				if m.Engine.Ctx.SearchFilter != "" && !strings.Contains(strings.ToLower(b.Title), strings.ToLower(m.Engine.Ctx.SearchFilter)) {
+					continue
+				}
 				if m.IssueCursor == i {
 					leftSide.WriteString(StyleSelectedOption.Render(fmt.Sprintf("> %s", b.Title)))
 				} else {
 					leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  %s", b.Title)))
 				}
-				leftSide.WriteString(spacingStr) // 👈 Dynamic Spacing Applied
+				leftSide.WriteString(spacingStr)
 			}
 		}
 
@@ -112,14 +177,17 @@ func (m AppModel) View() string {
 		} else {
 			for _, logEntry := range m.Issues {
 				leftSide.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#E2E2E2")).Render(fmt.Sprintf(" %s", logEntry.Title)))
-				leftSide.WriteString(spacingStr) // 👈 Dynamic Spacing Applied
+				leftSide.WriteString(spacingStr)
 			}
 			leftSide.WriteString(StyleHelpText.Render("\nPress [ESC] to return to dashboard..."))
 		}
 
 	case workflow.StateSelectIssue:
 		leftSide.WriteString(StyleHeader.Render("Select Target Tracking Issue:"))
-		leftSide.WriteString("\n\n")
+		leftSide.WriteString("\n")
+		// 🆕 Live Filter Header input box display
+		leftSide.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00FFD2")).Render(fmt.Sprintf("🔍 Live List Search Filter: %s█\n\n", m.Engine.Ctx.SearchFilter)))
+
 		if len(m.Issues) == 0 && !m.Loading {
 			leftSide.WriteString(lipgloss.NewStyle().Foreground(ColorTextMuted).Render("No open tracked issues found inside target repository.\n\n"))
 			leftSide.WriteString(StyleSelectedOption.Render("Press [n] to create a brand new GitHub Issue directly!"))
@@ -127,12 +195,16 @@ func (m AppModel) View() string {
 		} else {
 			leftSide.WriteString(StyleHelpText.Render("Tip: Press [n] to create a brand new issue on the fly\n\n"))
 			for i, issue := range m.Issues {
+				// Filter list matching checks before printing line layout
+				if m.Engine.Ctx.SearchFilter != "" && !strings.Contains(strings.ToLower(issue.Title), strings.ToLower(m.Engine.Ctx.SearchFilter)) {
+					continue
+				}
 				if m.IssueCursor == i {
 					leftSide.WriteString(StyleSelectedOption.Render(fmt.Sprintf("> #%d: %s", issue.Number, issue.Title)))
 				} else {
 					leftSide.WriteString(StyleUnselectedOption.Render(fmt.Sprintf("  #%d: %s", issue.Number, issue.Title)))
 				}
-				leftSide.WriteString(spacingStr) // 👈 Dynamic Spacing Applied
+				leftSide.WriteString(spacingStr)
 			}
 		}
 
@@ -183,7 +255,7 @@ func (m AppModel) View() string {
 		leftSide.WriteString(StyleHeader.Render("🚀 Ship It! Merge Authorization Step:"))
 		leftSide.WriteString("\n\n")
 		leftSide.WriteString("This step will execute the following automated actions:\n\n")
-		leftSide.WriteString("  1. Merge your PR into upstream destination branch\n")
+		leftSide.WriteString(fmt.Sprintf("  1. Merge your PR into upstream via %s\n", m.Config.Workflow.MergePolicy))
 		leftSide.WriteString("  2. Delete the remote tracking branch safely\n")
 		leftSide.WriteString(fmt.Sprintf("  3. Resolve and close issue target point #%d\n\n", m.Engine.Ctx.ActiveIssueNumber))
 		leftSide.WriteString(StyleSelectedOption.Render("Press [ENTER] to execute full workspace resolution."))
@@ -260,7 +332,8 @@ func (m AppModel) View() string {
 	finalView.WriteString(columnsJoined)
 	finalView.WriteString("\n")
 
-	finalView.WriteString(StyleHelpText.Render("\n[↑/↓ or j/k: Nav]  [Enter: Select/Advance]  [Esc: Reset to Dashboard]  [q: Exit Process]"))
+	// 🆕 Dynamic action key indicators display showing active panel focus toggles
+	finalView.WriteString(StyleHelpText.Render("\n[↑/↓: Nav] [Enter: Run] [Tab: Swap Active Panel] [Esc: Reset Menu] [q: Exit]"))
 
 	return finalView.String()
 }

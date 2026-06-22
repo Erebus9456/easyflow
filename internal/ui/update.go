@@ -3,10 +3,12 @@ package ui
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Erebus9456/easyflow/internal/git"
 	"github.com/Erebus9456/easyflow/internal/github"
 	"github.com/Erebus9456/easyflow/internal/workflow"
+	"github.com/Erebus9456/easyflow/utils"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,8 +29,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "tab": // Dual-Panel Tab Focus Toggling
+			if m.Engine.Ctx.PanelFocus == "left" {
+				m.Engine.Ctx.PanelFocus = "right"
+			} else {
+				m.Engine.Ctx.PanelFocus = "left"
+			}
+			return m, nil
 		case "esc":
 			m.Engine.Reset()
+			m.Engine.Ctx.SearchFilter = ""
+			m.Engine.Ctx.PanelFocus = "left"
 			m.Cursor = 0
 			m.IssueCursor = 0
 			m.ErrorMessage = ""
@@ -43,12 +54,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case issuesMsg:
 		m.Loading = false
 		m.Issues = msg
+		// 🆕 Append a virtual fallback navigation choice at the bottom of the list
+		m.Issues = append(m.Issues, github.Issue{Number: -1, Title: "➕ Create a brand new issue instead"})
 		return m, nil
 
 	case branchesMsg:
 		m.Loading = false
-		// Temporarily reuse Issues field or create lightweight mapping if necessary
-		// For clean structural compliance, we convert string arrays into a readable format or save to local structures
 		m.Issues = nil
 		for i, b := range msg {
 			m.Issues = append(m.Issues, github.Issue{Number: i + 1, Title: b})
@@ -74,6 +85,25 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// 🆕 Capture Alphanumeric characters on selection lists for Live Searching
+	// Added a preventative check ensuring key routing stays clear of swallowing shortcuts on isolated setups
+	if m.Engine.Ctx.CurrentStep == workflow.StateSelectIssue && len(m.Issues) <= 1 {
+		// Let the StateSelectIssue block exclusively process raw keystrokes if the menu holds no real issues
+	} else if m.Engine.Ctx.CurrentStep == workflow.StateSelectIssue || m.Engine.Ctx.CurrentStep == workflow.StateListBranches {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			kStr := keyMsg.String()
+			if len(kStr) == 1 && kStr >= " " && kStr <= "~" {
+				m.Engine.Ctx.SearchFilter += kStr
+				m.IssueCursor = 0 // Snap back to top row
+				return m, nil
+			} else if kStr == "backspace" && len(m.Engine.Ctx.SearchFilter) > 0 {
+				m.Engine.Ctx.SearchFilter = m.Engine.Ctx.SearchFilter[:len(m.Engine.Ctx.SearchFilter)-1]
+				m.IssueCursor = 0
+				return m, nil
+			}
+		}
+	}
+
 	// Route internal update configurations based on active state steps
 	switch m.Engine.Ctx.CurrentStep {
 	case workflow.StateDashboard:
@@ -89,6 +119,96 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "enter":
 				return m.handleMenuSelection()
+			}
+		}
+
+	case workflow.StateUnsavedChangesWarning: // Safety Intercept Screen
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			switch strings.ToLower(keyMsg.String()) {
+			case "y": // Bypass safety shield and skip to target view
+				m.Engine.Advance(workflow.StateManageBranches)
+				m.IssueCursor = 0
+			case "n", "enter": // Bounce back to dashboard safety
+				m.Engine.Reset()
+			}
+		}
+
+	case workflow.StateSettingsMenu: // Interactive Runtime Settings Controller
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			subOptions := GetSubMenuOptions("settings")
+			switch keyMsg.String() {
+			case "up", "k":
+				if m.IssueCursor > 0 {
+					m.IssueCursor--
+				}
+			case "down", "j":
+				if m.IssueCursor < len(subOptions)-1 {
+					m.IssueCursor++
+				}
+			case "enter": // Cycle through settings variables in memory
+				switch m.IssueCursor {
+				case 0: // Spacing Loop 1-4
+					m.Config.Layout.MenuSpacing++
+					if m.Config.Layout.MenuSpacing > 4 {
+						m.Config.Layout.MenuSpacing = 1
+					}
+				case 1: // Width Loop 40-70
+					m.Config.Layout.ColumnWidth += 10
+					if m.Config.Layout.ColumnWidth > 70 {
+						m.Config.Layout.ColumnWidth = 40
+					}
+				case 2: // Merge Rules
+					switch m.Config.Workflow.MergePolicy {
+					case "Standard Merge":
+						m.Config.Workflow.MergePolicy = "Squash Merge"
+					case "Squash Merge":
+						m.Config.Workflow.MergePolicy = "Rebase"
+					default:
+						m.Config.Workflow.MergePolicy = "Standard Merge"
+					}
+				case 3: // Toggle Safety Check Boolean
+					m.Config.Workflow.SafetyShield = !m.Config.Workflow.SafetyShield
+				}
+			}
+		}
+
+	case workflow.StateManageStash: // Stash Commands Control Layer
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			subOptions := GetSubMenuOptions("stash")
+			switch keyMsg.String() {
+			case "up", "k":
+				if m.IssueCursor > 0 {
+					m.IssueCursor--
+				}
+			case "down", "j":
+				if m.IssueCursor < len(subOptions)-1 {
+					m.IssueCursor++
+				}
+			case "enter":
+				m.Loading = true
+				switch m.IssueCursor {
+				case 0: // Save snapshot
+					return m, func() tea.Msg {
+						if _, _, err := utils.ExecuteCommand("git", "stash"); err != nil {
+							return errMsg(err)
+						}
+						return actionSuccessMsg("Current workspace modifications safely stashed away!")
+					}
+				case 1: // Pop entry
+					return m, func() tea.Msg {
+						if _, _, err := utils.ExecuteCommand("git", "stash", "pop"); err != nil {
+							return errMsg(err)
+						}
+						return actionSuccessMsg("Workspace state restored from stash stack successfully!")
+					}
+				case 2: // Clear shelf
+					return m, func() tea.Msg {
+						if _, _, err := utils.ExecuteCommand("git", "stash", "clear"); err != nil {
+							return errMsg(err)
+						}
+						return actionSuccessMsg("Stash history wiped clean!")
+					}
+				}
 			}
 		}
 
@@ -108,6 +228,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch m.IssueCursor {
 				case 0: // List
 					m.Engine.Advance(workflow.StateSelectIssue)
+					m.Engine.Ctx.SearchFilter = ""
 					m.Loading = true
 					return m, func() tea.Msg {
 						issues, err := github.FetchOpenIssues()
@@ -121,7 +242,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.TextInput.Placeholder = "Enter new issue title..."
 					m.TextInput.SetValue("")
 				case 2: // Close by ID
-					m.Engine.Advance(workflow.StateCreateIssue) // Reuse issue creation input field view for input matching
+					m.Engine.Advance(workflow.StateCreateIssue)
 					m.TextInput.Placeholder = "Enter raw Issue Number to close (e.g. 42)..."
 					m.TextInput.SetValue("")
 				}
@@ -144,9 +265,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch m.IssueCursor {
 				case 0, 2: // List existing for Checkout or Deletion
 					m.Engine.Advance(workflow.StateListBranches)
+					m.Engine.Ctx.SearchFilter = ""
 					m.Loading = true
-					// Clear previous selection markers
-					m.Cursor = m.IssueCursor // Track whether context was Checkout (0) or Delete (2)
+					m.Cursor = m.IssueCursor // Track Checkout (0) vs Delete (2)
 					m.IssueCursor = 0
 					return m, func() tea.Msg {
 						branches, err := git.ListLocalBranches()
@@ -218,6 +339,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.Issues) > 0 {
 					targetBranch := m.Issues[m.IssueCursor].Title
 					m.Loading = true
+					m.Engine.Ctx.SearchFilter = ""
 					if m.Cursor == 0 { // Checkout Mode
 						return m, func() tea.Msg {
 							if err := git.CheckoutBranch(targetBranch); err != nil {
@@ -242,28 +364,50 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case workflow.StateSelectIssue:
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
-			switch keyMsg.String() {
+			kStr := keyMsg.String()
+
+			// 1. If there are no active repository issues, back up 'n' as a direct forward trigger
+			if (len(m.Issues) == 0 || (len(m.Issues) == 1 && m.Issues[0].Number == -1)) && kStr == "n" {
+				m.Engine.Advance(workflow.StateCreateIssue)
+				m.TextInput.Placeholder = "Enter new issue title..."
+				m.TextInput.SetValue("")
+				m.Engine.Ctx.SearchFilter = ""
+				return m, nil
+			}
+
+			// 2. Standard Arrow/Navigation keys
+			switch kStr {
 			case "up", "k":
 				if m.IssueCursor > 0 {
 					m.IssueCursor--
 				}
+				return m, nil
 			case "down", "j":
 				if m.IssueCursor < len(m.Issues)-1 {
 					m.IssueCursor++
 				}
-			case "n":
-				m.Engine.Advance(workflow.StateCreateIssue)
-				m.TextInput.Placeholder = "Enter new issue title..."
-				m.TextInput.SetValue("")
 				return m, nil
 			case "enter":
 				if len(m.Issues) > 0 {
 					selected := m.Issues[m.IssueCursor]
+
+					// 🆕 Arrow Navigation selection override for the creation fallback option
+					if selected.Number == -1 {
+						m.Engine.Advance(workflow.StateCreateIssue)
+						m.TextInput.Placeholder = "Enter new issue title..."
+						m.TextInput.SetValue("")
+						m.Engine.Ctx.SearchFilter = ""
+						return m, nil
+					}
+
+					// Standard valid tracking issue loop setup routing path
 					m.Engine.Ctx.ActiveIssueNumber = selected.Number
 					m.Engine.Ctx.ActiveIssueTitle = selected.Title
+					m.Engine.Ctx.SearchFilter = ""
 					m.Engine.Advance(workflow.StateCreateBranch)
 					m.TextInput.SetValue(fmt.Sprintf("issue-%d", selected.Number))
 				}
+				return m, nil
 			}
 		}
 
@@ -275,7 +419,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			// Fallback routing: Check if user is actually running "Close Issue by ID" action
 			if m.TextInput.Placeholder == "Enter raw Issue Number to close (e.g. 42)..." {
 				num, err := strconv.Atoi(inputVal)
 				if err != nil {
@@ -291,7 +434,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			// Otherwise continue with standard creation route
 			m.Loading = true
 			return m, func() tea.Msg {
 				num, err := github.CreateIssue(inputVal)
@@ -421,7 +563,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m AppModel) handleMenuSelection() (tea.Model, tea.Cmd) {
 	m.ErrorMessage = ""
 	m.SuccessMsg = ""
-	m.IssueCursor = 0 // Clear list selection index for upcoming submenus
+	m.IssueCursor = 0
+
+	// Phase 1 Safety Shield Check: Intercept branch modification routes if workspace is dirty
+	if m.Config.Workflow.SafetyShield && (m.Cursor == 1 || m.Cursor == 3) {
+		stdout, _, _ := utils.ExecuteCommand("git", "status", "--porcelain")
+		if strings.TrimSpace(stdout) != "" {
+			m.Engine.Advance(workflow.StateUnsavedChangesWarning)
+			return m, nil
+		}
+	}
 
 	switch m.Cursor {
 	case 0: // Manage Issues Menu
@@ -430,9 +581,12 @@ func (m AppModel) handleMenuSelection() (tea.Model, tea.Cmd) {
 		m.Engine.Advance(workflow.StateManageBranches)
 	case 2: // Manage Commits Menu
 		m.Engine.Advance(workflow.StateManageCommits)
-	case 3: // Start continuous pipeline loop
+	case 3: // Manage Stash Menu
+		m.Engine.Advance(workflow.StateManageStash)
+	case 4: // Start continuous pipeline loop
 		m.Engine.Advance(workflow.StateSelectIssue)
 		m.Engine.Ctx.PipelineMode = true
+		m.Engine.Ctx.SearchFilter = ""
 		m.Loading = true
 		return m, func() tea.Msg {
 			issues, err := github.FetchOpenIssues()
@@ -441,16 +595,18 @@ func (m AppModel) handleMenuSelection() (tea.Model, tea.Cmd) {
 			}
 			return issuesMsg(issues)
 		}
-	case 4: // Manual Stage & Commit
+	case 5: // Manual Stage & Commit
 		m.Engine.Advance(workflow.StateCommitReady)
 		m.Engine.Ctx.PipelineMode = false
 		m.TextInput.Placeholder = "Write standard local commit message..."
 		m.TextInput.SetValue("")
-	case 5: // Manual Push Sync
+	case 6: // Manual Push Sync
 		m.Engine.Advance(workflow.StatePushing)
 		m.Engine.Ctx.PipelineMode = false
-	case 6: // Reset state engine
+	case 7: // Reset state engine
 		m.Engine.Reset()
+	case 8: // App Settings Configuration Menu
+		m.Engine.Advance(workflow.StateSettingsMenu)
 	}
 	return m, nil
 }
