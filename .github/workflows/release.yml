@@ -1,0 +1,95 @@
+name: Build and Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Triggers on semantic version tags like v1.0.0, v0.1.2, etc.
+
+permissions:
+  contents: write # Crucial: Allows the runner to create the release and upload assets
+
+jobs:
+  build-and-release:
+    name: Build Binaries & Create Release
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        # Cross-compilation matrix targets
+        include:
+          - goos: linux
+            goarch: amd64
+            artifact_name: easyflow-linux-amd64
+          - goos: linux
+            goarch: arm64
+            artifact_name: easyflow-linux-arm64
+          - goos: darwin
+            goarch: amd64
+            artifact_name: easyflow-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            artifact_name: easyflow-darwin-arm64
+          - goos: windows
+            goarch: amd64
+            artifact_name: easyflow-windows-amd64.exe
+
+    steps:
+      - name: Checkout Code Context
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches full commit logs to generate clean release notes
+
+      - name: Setup Go Runtime Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26' # Aligns with your local compiler env
+          cache: true        # Automatically caches your go.mod dependencies
+
+      - name: Install Modules
+        run: go mod download
+
+      - name: Compile Core Binary Matrix
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0 # Direct static link binary generation
+        run: |
+          go build -trimpath -ldflags="-s -w" -o build/${{ matrix.artifact_name }} main.go
+
+      - name: Upload Binary Snippets as Job Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: build/${{ matrix.artifact_name }}
+          retention-days: 1
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download All Matrices Binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Organize Target Assets Structure
+        run: |
+          mkdir dist
+          find release-artifacts -type f -exec cp {} dist/ \;
+          ls -R dist/
+
+      - name: Generate Dynamic Changelog & Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true # Automated changelog collection via GitHub engine
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
