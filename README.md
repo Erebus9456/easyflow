@@ -6,7 +6,7 @@
 
 Replace your browser, your manual git commands, and your context switching with a single interactive UI that drives your entire development loop.
 
-[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
+[![Go Version](https://img.shields.io/badge/go-1.26+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-6366f1?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Erebus9456/easyflow?style=flat-square&color=10b981)](https://github.com/Erebus9456/easyflow/releases)
 [![Stars](https://img.shields.io/github/stars/Erebus9456/easyflow?style=flat-square&color=f59e0b)](https://github.com/Erebus9456/easyflow/stargazers)
