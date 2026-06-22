@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="EasyFlow Logo" width="80" />
-
-# EasyFlow
+# 🚀EasyFlow
 
 **Terminal-first GitHub workflow automation — built in Go.**
 
@@ -10,8 +8,8 @@ Replace your browser, your manual git commands, and your context switching with 
 
 [![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-6366f1?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/your-username/easyflow?style=flat-square&color=10b981)](https://github.com/your-username/easyflow/releases)
-[![Stars](https://img.shields.io/github/stars/your-username/easyflow?style=flat-square&color=f59e0b)](https://github.com/your-username/easyflow/stargazers)
+[![Release](https://img.shields.io/github/v/release/Erebus9456/easyflow?style=flat-square&color=10b981)](https://github.com/Erebus9456/easyflow/releases)
+[![Stars](https://img.shields.io/github/stars/Erebus9456/easyflow?style=flat-square&color=f59e0b)](https://github.com/Erebus9456/easyflow/stargazers)
 
 <br />
 
@@ -38,13 +36,13 @@ Issue → Branch → Code → Commit → Push → PR → Merge → Close Issue
 **Using `go install`:**
 
 ```bash
-go install github.com/your-username/easyflow@latest
+go install github.com/Erebus9456/easyflow@latest
 ```
 
 **Build from source:**
 
 ```bash
-git clone https://github.com/your-username/easyflow.git
+git clone https://github.com/Erebus9456/easyflow.git
 cd easyflow
 go build -o easyflow .
 ```
@@ -181,7 +179,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 ## License
 
-MIT © [your-username](https://github.com/your-username)
+MIT © [Erebus9456](https://github.com/Erebus9456)
 
 ---
 
