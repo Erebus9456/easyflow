@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/Erebus9456/easyflow/internal/config"
 	"github.com/Erebus9456/easyflow/internal/git"
 	"github.com/Erebus9456/easyflow/internal/github"
 	"github.com/Erebus9456/easyflow/internal/workflow"
@@ -18,6 +19,8 @@ type AppModel struct {
 	Cursor      int
 	Issues      []github.Issue
 	IssueCursor int
+	// Layout Configurations
+	Layout config.LayoutConfig
 
 	// Input Subcomponents
 	TextInput textinput.Model
@@ -28,8 +31,6 @@ type AppModel struct {
 	ErrorMessage string
 	SuccessMsg   string
 }
-
-// View implements [tea.Model].
 
 // InitialModel configures a clean default state instantiation
 func InitialModel(repo *git.RepoContext) AppModel {
@@ -47,6 +48,7 @@ func InitialModel(repo *git.RepoContext) AppModel {
 		MenuItems: GetMainMenuOptions(),
 		TextInput: ti,
 		Spinner:   s,
+		Layout:    config.DefaultLayout(),
 	}
 }
 

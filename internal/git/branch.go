@@ -30,3 +30,39 @@ func CreateAndCheckoutBranch(name string) (string, error) {
 
 	return stdout, nil
 }
+
+// ListLocalBranches parses local branches for the selector panel
+func ListLocalBranches() ([]string, error) {
+	stdout, _, err := utils.ExecuteCommand("git", "branch", "--format=%(refname:short)")
+	if err != nil {
+		return nil, err
+	}
+
+	rawLines := strings.Split(stdout, "\n")
+	var branches []string
+	for _, line := range rawLines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			branches = append(branches, trimmed)
+		}
+	}
+	return branches, nil
+}
+
+// CheckoutBranch attempts to jump directly onto an existing branch target
+func CheckoutBranch(name string) error {
+	if name == "" {
+		return fmt.Errorf("target branch name cannot be blank")
+	}
+	_, _, err := utils.ExecuteCommand("git", "checkout", name)
+	return err
+}
+
+// DeleteLocalBranch safely deletes a branch using the standard '-d' verification flag
+func DeleteLocalBranch(name string) error {
+	if name == "" {
+		return fmt.Errorf("target branch name cannot be blank")
+	}
+	_, _, err := utils.ExecuteCommand("git", "branch", "-d", name)
+	return err
+}

@@ -28,12 +28,10 @@ var (
 
 	StyleSelectedOption = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorPrimary).
-				SetString("> ")
+				Foreground(ColorPrimary)
 
 	StyleUnselectedOption = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FFFFFF")).
-				SetString("  ")
+				Foreground(lipgloss.Color("#FFFFFF"))
 
 	StyleSuccessBanner = lipgloss.NewStyle().
 				Bold(true).

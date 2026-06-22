@@ -14,6 +14,15 @@ const (
 	StatePRPending
 	StateMerging
 	StateCompleted
+
+	// New CRUD Sub-Category Submenu View States
+	StateManageIssues
+	StateManageBranches
+	StateManageCommits
+
+	// New Explicit Action States
+	StateListBranches // Used for branch selection/checkout & deletion lists
+	StateViewCommits  // Used for displaying git log history entries
 )
 
 // RuntimeContext retains persistent cross-state memory metrics
@@ -23,7 +32,7 @@ type RuntimeContext struct {
 	BranchName        string
 	PullRequestURL    string
 	CurrentStep       State
-	PipelineMode      bool // 👈 Tracks if the user is in the continuous end-to-end loop
+	PipelineMode      bool // Tracks if the user is in the continuous end-to-end loop
 }
 
 // NewRuntimeContext builds a default tracking state
