@@ -153,7 +153,7 @@ easyflow/
 - [x] Full guided workflow (Issue → Close)
 - [x] GitHub CLI integration
 - [x] Interactive Bubble Tea UI
-- [ ] Multi-repo support
+- [ ] Multi-repo support 
 - [ ] Config profiles per repo
 - [ ] Custom keyboard shortcuts
 - [ ] AI-generated commit messages
@@ -173,18 +173,9 @@ git checkout -b feat/your-feature
 # Make changes, then open a PR
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 ---
 
 ## License
 
 MIT © [Erebus9456](https://github.com/Erebus9456)
-
----
-
-<div align="center">
-
-Built with [Charm](https://charm.sh) · Runs anywhere Git does
-
-</div>
