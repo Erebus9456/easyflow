@@ -22,6 +22,10 @@ func GetMainMenuOptions() []MainMenuItem {
 			Description: "Access CRUD: View mini git log history, stage everything, or undo check-ins",
 		},
 		{
+			Title:       "📦 Manage Stash Menu",
+			Description: "Access CRUD: Interactively save, pop, list, or clear development snapshots",
+		},
+		{
 			Title:       "🚀 Start Pipeline Work Loop",
 			Description: "Automated loop: Select Issue ➔ Branch ➔ Commit ➔ Push ➔ PR ➔ Merge",
 		},
@@ -36,6 +40,10 @@ func GetMainMenuOptions() []MainMenuItem {
 		{
 			Title:       "Reset Context State Engine",
 			Description: "Clears current operational memory flags back to factory defaults safely",
+		},
+		{
+			Title:       "⚙️ App Settings Configuration Menu",
+			Description: "Modify spacing layout parameters, merge policies, and safety validation guards",
 		},
 	}
 }
@@ -60,6 +68,19 @@ func GetSubMenuOptions(category string) []MainMenuItem {
 			{Title: "View Recent Commit Log", Description: "Inspect the last 5 local commit messages checked into this branch"},
 			{Title: "Stage & Commit Modifications", Description: "Instantly index all modified tracked files and record a commit message"},
 			{Title: "Undo Last Local Commit", Description: "Execute a soft reset back one revision to unstage files into your workspace"},
+		}
+	case "stash":
+		return []MainMenuItem{
+			{Title: "Save Snapshot to Stash", Description: "Tuck away your current local uncommitted changes onto the stash pile"},
+			{Title: "Pop Recent Stash Entry", Description: "Restore your most recently stashed snapshot back into your active workspace"},
+			{Title: "Clear Stash History", Description: "Forcibly drop and wipe clean all entries residing on your git stash shelf"},
+		}
+	case "settings":
+		return []MainMenuItem{
+			{Title: "Menu Spacing", Description: "Cycle vertical padding between terminal elements [1 - 4 lines]"},
+			{Title: "Column Width", Description: "Resize the active side-by-side terminal split width [40 - 70 chars]"},
+			{Title: "Merge Policy", Description: "Toggle remote merge behavior [Standard Merge / Squash Merge / Rebase]"},
+			{Title: "Safety Shield", Description: "Toggle strict enforcement blocks preventing dirty workspace actions"},
 		}
 	default:
 		return []MainMenuItem{}
