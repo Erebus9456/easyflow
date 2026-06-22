@@ -1,6 +1,6 @@
 module github.com/Erebus9456/easyflow
 
-go 1.26.3
+go 1.26
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
